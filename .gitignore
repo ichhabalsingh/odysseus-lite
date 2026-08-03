@@ -17,6 +17,7 @@ mock_scale_workspace/
 *_report.md
 *use_cases.md
 eval_summary.md
+odysseus_lite_architecture_blueprint.md
 
 # OS-specific files
 .DS_Store
