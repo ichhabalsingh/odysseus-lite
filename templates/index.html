@@ -467,8 +467,25 @@
     </header>
 
     <main>
+        <!-- LOG & OUTPUT VIEW AREA -->
+        <section class="log-area glass-panel">
+            <div class="log-header">
+                <h2><i class="fa-solid fa-terminal"></i> Agent Execution Timeline</h2>
+                <button id="btn-clear" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:0.9rem;">
+                    <i class="fa-solid fa-trash-can"></i> Clear logs
+                </button>
+            </div>
+            
+            <div id="log-window" class="log-window">
+                <!-- Log cards stream in here -->
+                <div class="log-card" style="background: rgba(255,255,255,0.02); text-align: center; color: var(--text-muted);">
+                    Waiting for task initialization. Enter a goal and click Run.
+                </div>
+            </div>
+        </section>
+
         <!-- SIDEBAR PANEL -->
-        <section class="sidebar">
+        <section class="sidebar right-side">
             <div class="glass-panel">
                 <h2><i class="fa-solid fa-sliders"></i> Control Center</h2>
                 
@@ -534,23 +551,6 @@
                         <i class="fa-solid fa-globe" style="color: var(--accent-purple); width: 16px; text-align: center;"></i>
                         <span><strong>tool_search</strong>: Search the public web</span>
                     </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- LOG & OUTPUT VIEW AREA -->
-        <section class="log-area glass-panel">
-            <div class="log-header">
-                <h2><i class="fa-solid fa-terminal"></i> Agent Execution Timeline</h2>
-                <button id="btn-clear" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:0.9rem;">
-                    <i class="fa-solid fa-trash-can"></i> Clear logs
-                </button>
-            </div>
-            
-            <div id="log-window" class="log-window">
-                <!-- Log cards stream in here -->
-                <div class="log-card" style="background: rgba(255,255,255,0.02); text-align: center; color: var(--text-muted);">
-                    Waiting for task initialization. Enter a goal and click Run.
                 </div>
             </div>
         </section>
