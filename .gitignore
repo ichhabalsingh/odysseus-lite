@@ -14,6 +14,9 @@ summary.txt
 report.pdf
 nested_test/
 mock_scale_workspace/
+*_report.md
+*use_cases.md
+eval_summary.md
 
 # OS-specific files
 .DS_Store
