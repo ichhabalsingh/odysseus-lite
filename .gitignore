@@ -1,0 +1,20 @@
+# Python environment
+.venv/
+venv/
+ENV/
+env/
+*.pyc
+__pycache__/
+
+# Local database / temporary test files
+*.db
+*.log
+custom_summary.txt
+summary.txt
+report.pdf
+nested_test/
+mock_scale_workspace/
+
+# OS-specific files
+.DS_Store
+Thumbs.db

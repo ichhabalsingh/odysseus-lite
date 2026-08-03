@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Odysseus Lite - Local Agent Dashboard</title>
+    <!-- Outfit Typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Marked.js Markdown Parser -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #282c34;
+            --panel-bg: rgba(17, 20, 24, 0.8);
+            --border-color: #355a66;
+            --primary-glow: rgba(224, 108, 117, 0.35);
+            --text-main: #abb2bf;
+            --text-muted: #5c6370;
+            
+            --accent-blue: #61afef;
+            --accent-purple: #c678dd;
+            --accent-orange: #d19a66;
+            --accent-green: #98c379;
+            --accent-red: #e06c75;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Outfit', sans-serif;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255,255,255,0.1) transparent;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(at 10% 20%, rgba(224, 108, 117, 0.12) 0px, transparent 50%),
+                radial-gradient(at 90% 80%, rgba(97, 175, 239, 0.1) 0px, transparent 50%);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* HEADER */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.25rem 2rem;
+            border-bottom: 1px solid var(--border-color);
+            backdrop-filter: blur(12px);
+            background: rgba(8, 12, 20, 0.5);
+            z-index: 10;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-weight: 700;
+            font-size: 1.5rem;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, #e06c75, #61afef);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            font-weight: 500;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 0.4rem 0.8rem;
+            border-radius: 50px;
+            border: 1px solid var(--border-color);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--accent-green);
+            box-shadow: 0 0 10px var(--accent-green);
+        }
+
+        /* MAIN CONTAINER */
+        main {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            padding: 1.5rem;
+            gap: 1.5rem;
+        }
+
+        /* SIDEBAR (Control Panel) */
+        .sidebar {
+            width: 380px;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            flex-shrink: 0;
+            overflow-y: auto;
+            padding-right: 0.25rem;
+        }
+
+        .glass-panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        h2 {
+            font-size: 1.15rem;
+            font-weight: 600;
+            margin-bottom: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #e5e7eb;
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        input, textarea, select {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-main);
+            padding: 0.75rem;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: var(--accent-red);
+            box-shadow: 0 0 10px rgba(224, 108, 117, 0.2);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        textarea {
+            resize: none;
+            height: 120px;
+        }
+
+        .btn-run {
+            width: 100%;
+            background: linear-gradient(135deg, var(--accent-red), var(--accent-blue));
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 0.9rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(224, 108, 117, 0.3);
+        }
+
+        .btn-run:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(224, 108, 117, 0.5);
+        }
+
+        .btn-run:disabled {
+            background: var(--border-color);
+            color: var(--text-muted);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* STATUS DISPLAY */
+        .status-container {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+        }
+
+        .status-value {
+            font-weight: 600;
+            color: var(--accent-purple);
+        }
+
+        /* LOG VIEW (Chat Area) */
+        .log-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .log-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 1rem;
+        }
+
+        .log-window {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+            padding-right: 0.5rem;
+        }
+
+        /* LOG EVENTS */
+        .log-card {
+            border-radius: 12px;
+            padding: 1.25rem;
+            animation: slideIn 0.3s ease forwards;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            line-height: 1.6;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .log-card.thought {
+            background: rgba(59, 130, 246, 0.08);
+            border-left: 4px solid var(--accent-blue);
+        }
+        .log-card.action {
+            background: rgba(249, 115, 22, 0.08);
+            border-left: 4px solid var(--accent-orange);
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+        .log-card.observation {
+            background: rgba(17, 24, 39, 0.5);
+            border-left: 4px solid var(--text-muted);
+            font-family: monospace;
+            font-size: 0.9rem;
+            white-space: pre-wrap;
+        }
+        .log-card.answer {
+            background: rgba(16, 185, 129, 0.08);
+            border-left: 4px solid var(--accent-green);
+        }
+        .log-card.error {
+            background: rgba(239, 68, 68, 0.08);
+            border-left: 4px solid var(--accent-red);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .thought .card-header { color: #93c5fd; }
+        .action .card-header { color: #fdba74; }
+        .observation .card-header { color: #cbd5e1; }
+        .answer .card-header { color: #6ee7b7; }
+        .error .card-header { color: #fca5a5; }
+
+        /* PERMISSION MODAL OVERLAY */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal {
+            width: 500px;
+            max-width: 90%;
+            background: #0f172a;
+            border: 1px solid var(--accent-red);
+            box-shadow: 0 0 25px rgba(239, 68, 68, 0.35);
+            border-radius: 16px;
+            padding: 2rem;
+            transform: scale(0.9);
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            text-align: center;
+        }
+
+        .overlay.active .modal {
+            transform: scale(1);
+        }
+
+        .modal-icon {
+            font-size: 3rem;
+            color: var(--accent-red);
+            margin-bottom: 1rem;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); text-shadow: 0 0 0 rgba(239, 68, 68, 0); }
+            50% { transform: scale(1.1); text-shadow: 0 0 15px rgba(239, 68, 68, 0.5); }
+            100% { transform: scale(1); text-shadow: 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        .modal h3 {
+            font-size: 1.35rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            color: #f8fafc;
+        }
+
+        .modal p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-details {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: monospace;
+            font-size: 0.9rem;
+            text-align: left;
+            margin-bottom: 1.75rem;
+            word-break: break-all;
+            max-height: 150px;
+            overflow-y: auto;
+            color: #cbd5e1;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .btn-confirm {
+            flex: 1;
+            border: none;
+            border-radius: 8px;
+            padding: 0.75rem;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            transition: all 0.2s ease;
+        }
+
+        .btn-confirm.approve {
+            background: var(--accent-green);
+            color: white;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-confirm.approve:hover {
+            background: #059669;
+            box-shadow: 0 6px 16px rgba(16, 185, 129, 0.5);
+        }
+
+        .btn-confirm.deny {
+            background: var(--accent-red);
+            color: white;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+        }
+
+        .btn-confirm.deny:hover {
+            background: #dc2626;
+            box-shadow: 0 6px 16px rgba(239, 68, 68, 0.5);
+        }
+
+        /* MARKDOWN STYLINGS */
+        .markdown-body ul, .markdown-body ol {
+            margin-left: 1.5rem;
+            margin-bottom: 0.75rem;
+        }
+        .markdown-body blockquote {
+            border-left: 4px solid var(--accent-purple);
+            padding-left: 1rem;
+            color: var(--text-muted);
+            margin: 0.75rem 0;
+            background: rgba(139, 92, 246, 0.05);
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+        }
+        .markdown-body code {
+            font-family: monospace;
+            background: rgba(255,255,255,0.08);
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+        .markdown-body pre code {
+            display: block;
+            padding: 1rem;
+            overflow-x: auto;
+            margin: 0.75rem 0;
+        }
+        .markdown-body h3 {
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo">
+            <i class="fa-solid fa-compass-drafting"></i>
+            <span>Odysseus Lite</span>
+        </div>
+        <div class="status-badge">
+            <span class="status-dot"></span>
+            <span>Ollama Connected</span>
+        </div>
+    </header>
+
+    <main>
+        <!-- SIDEBAR PANEL -->
+        <section class="sidebar">
+            <div class="glass-panel">
+                <h2><i class="fa-solid fa-sliders"></i> Control Center</h2>
+                
+                <div class="form-group">
+                    <label for="workspace-path">Workspace Path</label>
+                    <input type="text" id="workspace-path" value="{{ default_path }}">
+                </div>
+                
+                <div class="form-group">
+                    <label for="model-select">Agent Model</label>
+                    <select id="model-select">
+                        <option value="qwen2.5-coder:3b-instruct" {% if current_model == "qwen2.5-coder:3b-instruct" %}selected{% endif %}>Qwen 2.5 Coder 3B (Best)</option>
+                        <option value="granite4.1:3b" {% if current_model == "granite4.1:3b" %}selected{% endif %}>Granite 4.1 3B</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="goal-input">Research / Coding Goal</label>
+                    <textarea id="goal-input" placeholder="Type what you want Odysseus Lite to work on..."></textarea>
+                </div>
+                
+                <button id="btn-run" class="btn-run">
+                    <i class="fa-solid fa-play"></i> Initialize Agent
+                </button>
+            </div>
+
+            <div class="glass-panel status-container">
+                <h2><i class="fa-solid fa-circle-info"></i> Execution Status</h2>
+                <div class="status-row">
+                    <span>Active Cycle:</span>
+                    <span id="status-cycle" class="status-value">-</span>
+                </div>
+                <div class="status-row">
+                    <span>Task Status:</span>
+                    <span id="status-message" class="status-value">Ready</span>
+                </div>
+            </div>
+
+            <div class="glass-panel">
+                <h2><i class="fa-solid fa-toolbox"></i> Agent Capabilities</h2>
+                <div style="font-size: 0.85rem; display: flex; flex-direction: column; gap: 0.75rem; color: var(--text-muted);">
+                    <div style="display: flex; align-items: center; gap: 0.6rem;">
+                        <i class="fa-solid fa-file-pdf" style="color: var(--accent-purple); width: 16px; text-align: center;"></i>
+                        <span><strong>tool_read_file</strong>: Read files & extract PDF text</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.6rem;">
+                        <i class="fa-solid fa-file-pen" style="color: var(--accent-purple); width: 16px; text-align: center;"></i>
+                        <span><strong>tool_write_file</strong>: Write raw content to files</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.6rem;">
+                        <i class="fa-solid fa-file-import" style="color: var(--accent-purple); width: 16px; text-align: center;"></i>
+                        <span><strong>tool_append_file</strong>: Append content to files</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.6rem;">
+                        <i class="fa-solid fa-magnifying-glass-nodes" style="color: var(--accent-purple); width: 16px; text-align: center;"></i>
+                        <span><strong>tool_workspace_rag</strong>: Search codebase & PDFs</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.6rem;">
+                        <i class="fa-solid fa-terminal" style="color: var(--accent-purple); width: 16px; text-align: center;"></i>
+                        <span><strong>tool_bash</strong>: Run local shell commands</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.6rem;">
+                        <i class="fa-solid fa-globe" style="color: var(--accent-purple); width: 16px; text-align: center;"></i>
+                        <span><strong>tool_search</strong>: Search the public web</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- LOG & OUTPUT VIEW AREA -->
+        <section class="log-area glass-panel">
+            <div class="log-header">
+                <h2><i class="fa-solid fa-terminal"></i> Agent Execution Timeline</h2>
+                <button id="btn-clear" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:0.9rem;">
+                    <i class="fa-solid fa-trash-can"></i> Clear logs
+                </button>
+            </div>
+            
+            <div id="log-window" class="log-window">
+                <!-- Log cards stream in here -->
+                <div class="log-card" style="background: rgba(255,255,255,0.02); text-align: center; color: var(--text-muted);">
+                    Waiting for task initialization. Enter a goal and click Run.
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- INTERACTIVE PERMISSION MODAL OVERLAY -->
+    <div id="permission-overlay" class="overlay">
+        <div class="modal">
+            <i class="fa-solid fa-triangle-exclamation modal-icon"></i>
+            <h3>Security Gateway Requested</h3>
+            <p>Odysseus Lite wants your approval to execute the following tool action:</p>
+            <div id="modal-details" class="modal-details">
+                <!-- Details injected here -->
+            </div>
+            <div class="modal-actions">
+                <button id="btn-approve" class="btn-confirm approve">
+                    <i class="fa-solid fa-check"></i> Approve (y)
+                </button>
+                <button id="btn-deny" class="btn-confirm deny">
+                    <i class="fa-solid fa-xmark"></i> Deny (n)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JS SSE STREAM LOGIC -->
+    <script>
+        const btnRun = document.getElementById("btn-run");
+        const btnClear = document.getElementById("btn-clear");
+        const logWindow = document.getElementById("log-window");
+        const statusCycle = document.getElementById("status-cycle");
+        const statusMessage = document.getElementById("status-message");
+        
+        // Modal elements
+        const overlay = document.getElementById("permission-overlay");
+        const modalDetails = document.getElementById("modal-details");
+        const btnApprove = document.getElementById("btn-approve");
+        const btnDeny = document.getElementById("btn-deny");
+        
+        let eventSource = null;
+
+        // Establish Server Sent Events connection
+        function startLogStream() {
+            if (eventSource) {
+                eventSource.close();
+            }
+            
+            eventSource = new EventSource("/stream");
+            
+            eventSource.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                console.log("SSE Event Recv:", data);
+                
+                // Clear wait placeholder on first card
+                if (logWindow.children.length === 1 && logWindow.children[0].textContent.includes("Waiting for task")) {
+                    logWindow.innerHTML = "";
+                }
+                
+                switch(data.type) {
+                    case "status":
+                        statusMessage.textContent = data.message;
+                        break;
+                    case "cycle":
+                        statusCycle.textContent = data.message.replace("Cycle ", "");
+                        break;
+                    case "thought":
+                        addLogCard("thought", "Thought Process", data.message, "fa-solid fa-brain");
+                        break;
+                    case "action":
+                        addLogCard("action", `Action: ${data.tool}`, data.args, "fa-solid fa-bolt");
+                        break;
+                    case "observation":
+                        addLogCard("observation", "Observation (System Response)", data.message, "fa-solid fa-eye");
+                        break;
+                    case "answer":
+                        addLogCard("answer", "Final Answer / Goal Complete", data.message, "fa-solid fa-square-check");
+                        btnRun.disabled = false;
+                        btnRun.innerHTML = `<i class="fa-solid fa-play"></i> Initialize Agent`;
+                        break;
+                    case "error":
+                        addLogCard("error", "Error Block", data.message, "fa-solid fa-circle-exclamation");
+                        btnRun.disabled = false;
+                        btnRun.innerHTML = `<i class="fa-solid fa-play"></i> Initialize Agent`;
+                        break;
+                    case "permission_request":
+                        showPermissionModal(data.tool, data.message);
+                        break;
+                }
+            };
+        }
+
+        // Add log card to screen
+        function addLogCard(type, headerTitle, message, iconClass) {
+            const card = document.createElement("div");
+            card.className = `log-card ${type}`;
+            
+            // Format HTML using marked.js if it is markdown
+            let contentHTML = message;
+            if (type === "thought" || type === "answer" || type === "error" || type === "observation") {
+                contentHTML = `<div class="markdown-body">${marked.parse(message)}</div>`;
+            } else {
+                contentHTML = `<code>${message.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code>`;
+            }
+            
+            card.innerHTML = `
+                <div class="card-header">
+                    <i class="${iconClass}"></i> ${headerTitle}
+                </div>
+                <div class="card-body">
+                    ${contentHTML}
+                </div>
+            `;
+            
+            logWindow.appendChild(card);
+            logWindow.scrollTop = logWindow.scrollHeight; // Auto Scroll
+        }
+
+        // Display confirmation warning modal
+        function showPermissionModal(tool, details) {
+            modalDetails.textContent = details;
+            overlay.classList.add("active");
+        }
+
+        // Send decision to backend
+        async function submitDecision(decision) {
+            overlay.classList.remove("active");
+            try {
+                await fetch("/approve", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ decision })
+                });
+            } catch (err) {
+                console.error("Failed to submit approval decision:", err);
+            }
+        }
+
+        // Event Listeners
+        btnRun.addEventListener("click", async () => {
+            const goal = document.getElementById("goal-input").value.trim();
+            const workspace = document.getElementById("workspace-path").value.trim();
+            const model = document.getElementById("model-select").value;
+            
+            if (!goal) {
+                alert("Please enter a goal first.");
+                return;
+            }
+            
+            btnRun.disabled = true;
+            btnRun.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Agent Running...`;
+            logWindow.innerHTML = "";
+            statusCycle.textContent = "-";
+            statusMessage.textContent = "Connecting...";
+            
+            // Establish SSE connection prior to triggering execution
+            startLogStream();
+            
+            try {
+                const res = await fetch("/run", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ goal, workspace, model })
+                });
+                const result = await res.json();
+                
+                if (result.status === "error") {
+                    alert(result.message);
+                    btnRun.disabled = false;
+                    btnRun.innerHTML = `<i class="fa-solid fa-play"></i> Initialize Agent`;
+                }
+            } catch (err) {
+                alert("Server Connection Failed.");
+                btnRun.disabled = false;
+                btnRun.innerHTML = `<i class="fa-solid fa-play"></i> Initialize Agent`;
+            }
+        });
+
+        btnClear.addEventListener("click", () => {
+            logWindow.innerHTML = `
+                <div class="log-card" style="background: rgba(255,255,255,0.02); text-align: center; color: var(--text-muted);">
+                    Waiting for task initialization. Enter a goal and click Run.
+                </div>
+            `;
+            statusCycle.textContent = "-";
+            statusMessage.textContent = "Ready";
+        });
+
+        btnApprove.addEventListener("click", () => submitDecision("y"));
+        btnDeny.addEventListener("click", () => submitDecision("n"));
+    </script>
+</body>
+</html>

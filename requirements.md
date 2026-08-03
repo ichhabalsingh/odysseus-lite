@@ -1,0 +1,2 @@
+ollama
+duckduckgo_search
