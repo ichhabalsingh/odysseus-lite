@@ -344,6 +344,10 @@ Rules:
         if append_match:
             return "tool_append_file", {"path": append_match.group(1), "content": append_match.group(2)}
 
+        read_match = re.search(r'<tool_read_file\s+path="([^"]+)"(?:\s*/)?>(?:</tool_read_file>)?', action_text)
+        if read_match:
+            return "tool_read_file", {"path": read_match.group(1)}
+
         # 2. Parse general tool tags
         for tag in registry.registry.keys():
             if tag in ["tool_write_file", "tool_append_file"]:
@@ -418,7 +422,13 @@ Rules:
                 self.messages.append({"role": "user", "content": f"OBSERVE: {args}"})
             else:
                 # No action found
-                prompt_more = "Please continue. Select a registered tool or output your final ANSWER."
+                prompt_more = (
+                    "Error: You did not output a valid tool action tag. "
+                    "If you want to call a tool, you MUST write the tag (e.g. <tool_name>{\"arg\": \"val\"}</tool_name>). "
+                    "If you are finished, you MUST write ANSWER: followed by your response. "
+                    "Please choose a tool or answer now."
+                )
+                self.log_debug("SYSTEM WARNING", prompt_more, color="\033[91m")
                 self.messages.append({"role": "user", "content": prompt_more})
 
 # =====================================================================
