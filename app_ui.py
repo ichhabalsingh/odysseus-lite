@@ -296,65 +296,148 @@ Rules:
                         return None, f"Error: Invalid JSON/Python dict inside <{tag}>."
         return None, None
 
-    def execute_loop(self, max_cycles=10):
-        state.event_queue.put({"type": "status", "message": f"Starting task: {self.goal}"})
+    def run_planner(self, goal: str) -> list:
+        state.event_queue.put({"type": "status", "message": "Analyzing goal and generating plan..."})
+        tools_info = web_registry.get_instructions()
+        prompt = f"""You are the Schema-Driven Planner. Break down the user goal into a sequence of atomic steps.
+Each step MUST map directly to one of the available tools below. Do not plan steps that cannot be executed by these tools.
+
+{tools_info}
+
+Output the plan as a JSON list of objects. Each object MUST contain:
+- "tool": The exact tool name from the list.
+- "description": The task description for the Executor.
+
+Do not output any other text or markdown.
+
+Example JSON output:
+[
+  {{"tool": "tool_read_file", "description": "Read the file grade_rice.py to inspect its categories"}},
+  {{"tool": "tool_write_file", "description": "Write the categories summary to tests_summary.txt"}}
+]
+
+User Goal: {goal}
+"""
+        try:
+            res = ollama.chat(
+                model=Config.PLANNER_MODEL,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            content = res['message']['content'].strip()
+            content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
+            content = content.replace("```json", "").replace("```", "").strip()
+            return json.loads(content)
+        except Exception:
+            # Fallback regex parser
+            steps = []
+            matches = re.findall(r'\{\s*"tool"\s*:\s*"([^"]+)"\s*,\s*"description"\s*:\s*"([^"]+)"\s*\}', content if 'content' in locals() else "")
+            for tool, desc in matches:
+                steps.append({"tool": tool, "description": desc})
+            return steps if steps else [{"tool": "tool_read_file", "description": f"Process: {goal}"}]
+
+    def compact_observation(self, step_desc: str, observation: str) -> str:
+        if len(observation) < 500:
+            return observation
+        state.event_queue.put({"type": "status", "message": "State Compactor active: condensing tool observation..."})
+        prompt = f"""Summarize the key information found in this tool observation for the step "{step_desc}".
+Keep it to 1 or 2 sentences max. Focus only on facts, paths, ports, or versions found.
+
+Tool Observation:
+{observation[:4000]}
+"""
+        res = ollama.chat(
+            model=state.model,
+            messages=[{"role": "user", "content": prompt}],
+            options={"temperature": 0.1}
+        )
+        return res['message']['content'].strip()
+
+    def execute_loop(self):
+        # 1. Run Planner
+        steps = self.run_planner(self.goal)
+        state.event_queue.put({"type": "status", "message": f"Generated {len(steps)} steps. Initializing execution..."})
         
-        for cycle in range(1, max_cycles + 1):
-            state.event_queue.put({"type": "cycle", "message": f"Cycle {cycle}/{max_cycles}"})
+        # Broadcast steps to log timeline
+        steps_display = "\\n".join([f"{i}. [{s.get('tool')}] {s.get('description')}" for i, s in enumerate(steps, 1)])
+        state.event_queue.put({"type": "thought", "message": f"Generated Step Plan:\\n{steps_display}"})
+        
+        history_context = ""
+        
+        # 2. Loop steps
+        for idx, step in enumerate(steps, 1):
+            tool_name = step.get("tool", "tool_read_file")
+            step_desc = step.get("description", "")
             
+            state.event_queue.put({"type": "cycle", "message": f"Step {idx}/{len(steps)}"})
+            state.event_queue.put({"type": "status", "message": f"Executing: {step_desc} ({tool_name})"})
+            
+            tool_desc = "Custom writing"
+            tool_usage = "XML block"
+            if tool_name in web_registry.registry:
+                tool_desc = web_registry.registry[tool_name]['description']
+                tool_usage = web_registry.registry[tool_name]['usage']
+                
+            prompt = f"""You are the Executor. Your current target is to run the tool "{tool_name}" to accomplish this goal:
+"{step_desc}"
+
+Previous history:
+{history_context}
+
+Tool Schema:
+- {tool_name}: {tool_desc} (Usage format: {tool_usage})
+If this is tool_write_file or tool_append_file, output raw XML block:
+<{tool_name} path="filename">content</{tool_name}>
+
+Otherwise, output standard tool tag:
+<{tool_name}>{{"arguments"}}</{tool_name}>
+
+You MUST output:
+THOUGHT: Explain why you are choosing the arguments.
+ACTION: The tool block populated with your arguments.
+"""
             try:
                 res = ollama.chat(
                     model=state.model,
-                    messages=self.messages,
-                    keep_alive=Config.KEEP_ALIVE,
+                    messages=[{"role": "user", "content": prompt}],
                     options={"temperature": 0.1, "num_ctx": 8192}
                 )
             except Exception as e:
                 state.event_queue.put({"type": "error", "message": f"Ollama Connection Error: {str(e)}"})
                 break
                 
-            response_content = res['message']['content']
+            response_content = res['message']['content'].strip()
             
-            # Auto-fix XML tags
+            # Repackage XML format
             for tag in ["tool_search", "tool_bash", "tool_write_file", "tool_append_file", "tool_read_file"]:
                 if f"<{tag}" in response_content and f"</{tag}>" not in response_content:
                     response_content = response_content.strip() + f"</{tag}>"
                     
-            self.messages.append({"role": "assistant", "content": response_content})
-            
-            # Yield thoughts
+            # Stream thought to dashboard
             thought_match = re.search(r"THOUGHT:(.*?)(?=ACTION:|ANSWER:|$)", response_content, re.DOTALL)
             if thought_match:
                 state.event_queue.put({"type": "thought", "message": thought_match.group(1).strip()})
                 
-            # Check answer
-            if "ANSWER:" in response_content:
-                ans = response_content.split("ANSWER:")[-1].strip()
-                state.event_queue.put({"type": "answer", "message": ans})
-                break
-                
-            # Execute tool action
+            # Parse action
             tag, args = self.parse_action(response_content)
-            if tag:
-                state.event_queue.put({"type": "action", "tool": tag, "args": f"<{tag}> {args}"})
+            if not tag:
+                tag = tool_name
+                args = {"path": step_desc}
                 
-                # Execute action (will block if permission requested)
-                observation = web_registry.execute(tag, args)
-                state.event_queue.put({"type": "observation", "message": observation})
-                self.messages.append({"role": "user", "content": f"OBSERVE: {observation}"})
-            elif isinstance(args, str) and args.startswith("Error:"):
-                state.event_queue.put({"type": "error", "message": args})
-                self.messages.append({"role": "user", "content": f"OBSERVE: {args}"})
-            else:
-                prompt_more = (
-                    "Error: You did not output a valid tool action tag. "
-                    "If you want to call a tool, you MUST write the tag (e.g. <tool_name>{\"arg\": \"val\"}</tool_name>). "
-                    "If you are finished, you MUST write ANSWER: followed by your response. "
-                    "Please choose a tool or answer now."
-                )
-                self.messages.append({"role": "user", "content": prompt_more})
+            state.event_queue.put({"type": "action", "tool": tag, "args": f"<{tag}> {args}"})
+            
+            # Execute tool (blocks if permission requested)
+            observation = web_registry.execute(tag, args)
+            state.event_queue.put({"type": "observation", "message": f"Ran tool <{tag}>: {observation[:200]}..."})
+            
+            # Compact observation
+            compact_obs = self.compact_observation(step_desc, observation)
+            if len(observation) >= 500:
+                state.event_queue.put({"type": "thought", "message": f"[State Compactor] Condensation:\\n{compact_obs}"})
+                
+            history_context += f"Step: {step_desc}\nAction: <{tag}> {args}\nResult: {compact_obs}\n\n"
 
-        state.event_queue.put({"type": "status", "message": "Task complete."})
+        state.event_queue.put({"type": "status", "message": "Goal achieved successfully."})
+        state.event_queue.put({"type": "answer", "message": "Task complete. Output generated successfully."})
 
 # =====================================================================
 # FLASK WEB INTERFACE APIS
@@ -420,12 +503,13 @@ if __name__ == '__main__':
     # Make templates directory if missing
     os.makedirs('templates', exist_ok=True)
     
-    # Pre-warm model in memory
+    # Pre-warm models in memory
     try:
-        ollama.chat(model=state.model, messages=[{"role": "user", "content": "ping"}], keep_alive=Config.KEEP_ALIVE)
+        ollama.chat(model=Config.EXECUTOR_MODEL, messages=[{"role": "user", "content": "ping"}], keep_alive=Config.KEEP_ALIVE)
+        ollama.chat(model=Config.PLANNER_MODEL, messages=[{"role": "user", "content": "ping"}], keep_alive=Config.KEEP_ALIVE)
         print("✓ Connected to Ollama.")
     except Exception as e:
-        print(f"Warning: Could not preload model '{state.model}' over Ollama. details: {e}")
+        print(f"Warning: Could not preload models over Ollama. details: {e}")
         
     # Run server locally
     app.run(host='127.0.0.1', port=5000, debug=True)

@@ -14,7 +14,8 @@ import ollama
 # 1. CONFIGURATION
 # =====================================================================
 class Config:
-    MODEL = "qwen2.5-coder:3b-instruct"  # Optimized local coder/agent model
+    PLANNER_MODEL = "llama3.1:8b"
+    EXECUTOR_MODEL = "qwen2.5-coder:3b-instruct"
     NUM_CTX = 8192                       # High context window
     TEMPERATURE = 0.1                    # Deterministic tool execution
     WORKSPACE_DIR = os.getcwd()          # Target workspace directory
@@ -373,63 +374,151 @@ Rules:
                         return None, f"Error: Invalid JSON/Python dict inside <{tag}>."
         return None, None
 
-    def run(self, max_cycles=10):
+    def run_planner(self, goal: str) -> list:
+        """Call the planner model to break down a goal into register-mapped steps."""
+        tools_info = registry.get_system_instructions()
+        prompt = f"""You are the Schema-Driven Planner. Break down the user goal into a sequence of atomic steps.
+Each step MUST map directly to one of the available tools below. Do not plan steps that cannot be executed by these tools.
+
+{tools_info}
+
+Output the plan as a JSON list of objects. Each object MUST contain:
+- "tool": The exact tool name from the list.
+- "description": The task description for the Executor.
+
+Do not output any other text or markdown.
+
+Example JSON output:
+[
+  {{"tool": "tool_read_file", "description": "Read the file grade_rice.py to inspect its categories"}},
+  {{"tool": "tool_write_file", "description": "Write the categories summary to tests_summary.txt"}}
+]
+
+User Goal: {goal}
+"""
+        res = ollama.chat(
+            model=Config.PLANNER_MODEL,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        content = res['message']['content'].strip()
+        content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
+        
+        # Clean markdown code block wraps
+        if content.startswith("```json"): content = content[7:]
+        if content.startswith("```"): content = content[3:]
+        if content.endswith("```"): content = content[:-3]
+        content = content.strip()
+        
+        try:
+            return json.loads(content)
+        except Exception:
+            # Fallback regex parser for small model JSON deviation
+            steps = []
+            matches = re.findall(r'\{\s*"tool"\s*:\s*"([^"]+)"\s*,\s*"description"\s*:\s*"([^"]+)"\s*\}', content)
+            for tool, desc in matches:
+                steps.append({"tool": tool, "description": desc})
+            return steps if steps else [{"tool": "tool_read_file", "description": f"Process goal: {goal}"}]
+
+    def compact_observation(self, step_desc: str, observation: str) -> str:
+        """Condense large tool outputs into 1-2 sentence summaries to save context space."""
+        if len(observation) < 500:
+            return observation
+        prompt = f"""Summarize the key information found in this tool observation for the step "{step_desc}".
+Keep it to 1 or 2 sentences max. Focus only on facts, paths, ports, or versions found.
+
+Tool Observation:
+{observation[:4000]}
+"""
+        res = ollama.chat(
+            model=Config.EXECUTOR_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            options={"temperature": 0.1}
+        )
+        return res['message']['content'].strip()
+
+    def run(self):
         self.log_debug("GOAL", self.goal, color="\033[95m")
         
-        for cycle in range(1, max_cycles + 1):
-            print(f"\n--- Cycle {cycle}/{max_cycles} ---")
+        # 1. Run Planner
+        steps = self.run_planner(self.goal)
+        print("\n=== GENERATED PLAN ===")
+        for i, step in enumerate(steps, 1):
+            print(f"{i}. [{step.get('tool')}] {step.get('description')}")
+        print("======================\n")
+        
+        history_context = ""
+        
+        # 2. Sequential Step-by-Step Execution
+        for idx, step in enumerate(steps, 1):
+            tool_name = step.get("tool", "tool_read_file")
+            step_desc = step.get("description", "")
+            print(f"\n--- Step {idx}/{len(steps)}: {step_desc} ({tool_name}) ---")
             
-            # Query LLM
+            tool_desc = "Custom writing"
+            tool_usage = "XML block"
+            if tool_name in registry.registry:
+                tool_desc = registry.registry[tool_name]['description']
+                tool_usage = registry.registry[tool_name]['usage']
+                
+            prompt = f"""You are the Executor. Your current target is to run the tool "{tool_name}" to accomplish this goal:
+"{step_desc}"
+
+Previous history:
+{history_context}
+
+Tool Schema:
+- {tool_name}: {tool_desc} (Usage format: {tool_usage})
+If this is tool_write_file or tool_append_file, output raw XML block:
+<{tool_name} path="filename">content</{tool_name}>
+
+Otherwise, output standard tool tag:
+<{tool_name}>{{"arguments"}}</{tool_name}>
+
+You MUST output:
+THOUGHT: Explain why you are choosing the arguments.
+ACTION: The tool block populated with your arguments.
+"""
+            # Query Executor LLM
             res = ollama.chat(
-                model=Config.MODEL,
-                messages=self.messages,
-                keep_alive=Config.KEEP_ALIVE,
+                model=Config.EXECUTOR_MODEL,
+                messages=[{"role": "user", "content": prompt}],
                 options={
                     "temperature": Config.TEMPERATURE,
                     "num_ctx": Config.NUM_CTX
                 }
             )
+            response_content = res['message']['content'].strip()
             
-            response_content = res['message']['content']
-            
-            # Run auto-fix tag repair
+            # Repackage XML format
             response_content = self.repair_broken_xml_tags(response_content)
             
-            self.messages.append({"role": "assistant", "content": response_content})
-            
-            # Print thoughts & actions to stdout
-            # Split thought and action for presentation
+            # Print thoughts to console
             thought_match = re.search(r"THOUGHT:(.*?)(?=ACTION:|ANSWER:|$)", response_content, re.DOTALL)
             if thought_match:
                 self.log_debug("THOUGHT", thought_match.group(1).strip())
-            
-            if "ANSWER:" in response_content:
-                answer_content = response_content.split("ANSWER:")[-1].strip()
-                self.log_debug("ANSWER", answer_content, color="\033[92m")
-                break
                 
-            # Parse and execute action
+            # Parse action
             tag, args = self.parse_action(response_content)
+            if not tag:
+                # If no tag matches, verify if a simple tool name was used
+                tag = tool_name
+                args = {"path": step_desc}
+                
+            self.log_debug("ACTION", f"<{tag}> {args}", color="\033[93m")
             
-            if tag:
-                self.log_debug("ACTION", f"<{tag}> {args}", color="\033[93m")
-                observation = registry.execute(tag, args)
-                self.log_debug("OBSERVATION", observation, color="\033[90m")
-                self.messages.append({"role": "user", "content": f"OBSERVE: {observation}"})
-            elif isinstance(args, str) and args.startswith("Error:"):
-                # Invalid JSON syntax
-                self.log_debug("ACTION ERROR", args, color="\033[91m")
-                self.messages.append({"role": "user", "content": f"OBSERVE: {args}"})
-            else:
-                # No action found
-                prompt_more = (
-                    "Error: You did not output a valid tool action tag. "
-                    "If you want to call a tool, you MUST write the tag (e.g. <tool_name>{\"arg\": \"val\"}</tool_name>). "
-                    "If you are finished, you MUST write ANSWER: followed by your response. "
-                    "Please choose a tool or answer now."
-                )
-                self.log_debug("SYSTEM WARNING", prompt_more, color="\033[91m")
-                self.messages.append({"role": "user", "content": prompt_more})
+            # Execute tool
+            observation = registry.execute(tag, args)
+            self.log_debug("OBSERVATION", f"{observation[:200]}...", color="\033[90m")
+            
+            # Compact observation
+            compact_obs = self.compact_observation(step_desc, observation)
+            if len(observation) >= 500:
+                self.log_debug("COMPACTOR", compact_obs, color="\033[96m")
+                
+            history_context += f"Step: {step_desc}\nAction: <{tag}> {args}\nResult: {compact_obs}\n\n"
+            
+        print("\n=== GOAL COMPLETE ===")
+        self.log_debug("FINAL RESULTS SUMMARY", history_context, color="\033[92m")
 
 # =====================================================================
 # 6. CLI ENTRYPOINT
@@ -451,12 +540,13 @@ if __name__ == "__main__":
     # Re-initialize the local RAG engine for the target workspace
     rag_indexer = LocalRAG(Config.WORKSPACE_DIR)
     
-    # Check if Ollama is running and has the model pulled
+    # Check if Ollama is running and has models pulled
     try:
-        # Preload the model to save startup latency
-        ollama.chat(model=Config.MODEL, messages=[{"role": "user", "content": "ping"}], keep_alive=Config.KEEP_ALIVE)
+        # Preload models to save startup latency
+        ollama.chat(model=Config.EXECUTOR_MODEL, messages=[{"role": "user", "content": "ping"}], keep_alive=Config.KEEP_ALIVE)
+        ollama.chat(model=Config.PLANNER_MODEL, messages=[{"role": "user", "content": "ping"}], keep_alive=Config.KEEP_ALIVE)
     except Exception as e:
-        print(f"Error: Cannot connect to Ollama. Make sure 'ollama serve' is running and you have run 'ollama pull {Config.MODEL}'.")
+        print(f"Error: Cannot connect to Ollama. Make sure 'ollama serve' is running and you have pulled '{Config.EXECUTOR_MODEL}' and '{Config.PLANNER_MODEL}'.")
         print(f"Details: {e}")
         sys.exit(1)
         
