@@ -527,10 +527,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Odysseus Lite: Local AI Workspace Assistant CLI")
     parser.add_argument("goal", type=str, help="The research or coding task goal for the agent.")
     parser.add_argument("-w", "--workspace", type=str, default=os.getcwd(), help="Path to the workspace directory to scan and work in.")
+    parser.add_argument("-p", "--planner", type=str, default=Config.PLANNER_MODEL, help="Model to use for step planning.")
+    parser.add_argument("-e", "--executor", type=str, default=Config.EXECUTOR_MODEL, help="Model to use for step execution.")
     args = parser.parse_args()
     
-    # Update configuration with target workspace path
+    # Update configurations
     Config.WORKSPACE_DIR = os.path.abspath(args.workspace)
+    Config.PLANNER_MODEL = args.planner
+    Config.EXECUTOR_MODEL = args.executor
     if not os.path.exists(Config.WORKSPACE_DIR):
         print(f"Error: Workspace path '{Config.WORKSPACE_DIR}' does not exist.")
         sys.exit(1)

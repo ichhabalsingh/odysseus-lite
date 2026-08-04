@@ -25,6 +25,7 @@ class AgentState:
         self.current_permission_request = None
         self.workspace_dir = os.getcwd()
         self.model = "qwen2.5-coder:3b-instruct"
+        self.planner_model = "llama3.1:8b"
         self.rag_indexer = None
 
 state = AgentState()
@@ -320,7 +321,7 @@ User Goal: {goal}
 """
         try:
             res = ollama.chat(
-                model=Config.PLANNER_MODEL,
+                model=state.planner_model,
                 messages=[{"role": "user", "content": prompt}]
             )
             content = res['message']['content'].strip()
@@ -446,7 +447,7 @@ ACTION: The tool block populated with your arguments.
 @app.route('/')
 def index():
     # Render static front page
-    return render_template('index.html', default_path=state.workspace_dir, current_model=state.model)
+    return render_template('index.html', default_path=state.workspace_dir, current_model=state.model, current_planner=state.planner_model)
 
 @app.route('/run', methods=['POST'])
 def run_agent():
@@ -454,12 +455,14 @@ def run_agent():
     goal = data.get("goal", "")
     workspace = data.get("workspace", "")
     model = data.get("model", "")
+    planner_model = data.get("planner_model", "llama3.1:8b")
     
     if not goal:
         return jsonify({"status": "error", "message": "No goal provided"}), 400
         
     state.workspace_dir = os.path.abspath(workspace)
     state.model = model
+    state.planner_model = planner_model
     
     # Verify path
     if not os.path.exists(state.workspace_dir):
