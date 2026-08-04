@@ -29,7 +29,7 @@ def execute_mock_tool(tag: str, args: dict) -> str:
     else:                                                                                                                                                                                    
         return f"Unknown tool: {tag}"                                                                                                                                                        
                                                                                                                                                                                                 
-def run_agent(prompt: str, model_name="llama3.1:8b"):                                                                                                                          
+def run_agent(prompt: str, model_name="qwen2.5-coder:3b-instruct"):                                                                                                                          
     print(f"User Prompt: {prompt}\n" + "="*50)                                                                                                                                               
                                                                                                                                                                                                 
     # Initialize message history                                                                                                                                                             
