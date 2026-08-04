@@ -20,6 +20,9 @@ eval_summary.md
 odysseus_lite_architecture_blueprint.md
 research_paper.tex
 dashboard_screenshot.png
+benchmark_latency.png
+benchmark_errors.png
+architecture_flowchart.png
 
 # OS-specific files
 .DS_Store
