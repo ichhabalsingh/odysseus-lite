@@ -236,60 +236,92 @@
             overflow-y: auto;
             display: flex;
             flex-direction: column;
-            gap: 1.25rem;
-            padding-right: 0.5rem;
+            gap: 0.85rem;
+            padding-left: 1.25rem;
+            border-left: 2px solid rgba(255, 255, 255, 0.08);
+            position: relative;
+            margin-left: 0.5rem;
         }
 
-        /* LOG EVENTS */
+        /* TIMELINE LOG ITEMS */
         .log-card {
-            border-radius: 12px;
-            padding: 1.25rem;
-            animation: slideIn 0.3s ease forwards;
-            border: 1px solid rgba(255, 255, 255, 0.04);
-            line-height: 1.6;
+            position: relative;
+            background: transparent;
+            border: none;
+            padding: 0.4rem 0;
+            line-height: 1.5;
+            font-size: 0.9rem;
+            animation: fadeIn 0.25s ease forwards;
         }
 
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateY(10px); }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(4px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
-        .log-card.thought {
-            background: rgba(59, 130, 246, 0.08);
-            border-left: 4px solid var(--accent-blue);
+        /* CHRONOLOGICAL NODES */
+        .log-card::before {
+            content: '';
+            position: absolute;
+            left: calc(-1.25rem - 6px);
+            top: 0.65rem;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--text-muted);
+            border: 2px solid var(--bg-dark);
+            z-index: 2;
         }
-        .log-card.action {
-            background: rgba(249, 115, 22, 0.08);
-            border-left: 4px solid var(--accent-orange);
-            font-family: monospace;
-            font-size: 0.9rem;
-        }
-        .log-card.observation {
-            background: rgba(17, 24, 39, 0.5);
-            border-left: 4px solid var(--text-muted);
-            font-family: monospace;
-            font-size: 0.9rem;
-            white-space: pre-wrap;
-        }
-        .log-card.answer {
-            background: rgba(16, 185, 129, 0.08);
-            border-left: 4px solid var(--accent-green);
-        }
-        .log-card.error {
-            background: rgba(239, 68, 68, 0.08);
-            border-left: 4px solid var(--accent-red);
-        }
+
+        .log-card.thought::before { background: var(--accent-blue); }
+        .log-card.action::before { background: var(--accent-orange); }
+        .log-card.observation::before { background: #8e95a0; }
+        .log-card.answer::before { background: var(--accent-green); }
+        .log-card.error::before { background: var(--accent-red); }
 
         .card-header {
             display: flex;
             align-items: center;
             gap: 0.5rem;
             font-weight: 600;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            margin-bottom: 0.75rem;
-            color: var(--text-muted);
+            margin-bottom: 0.4rem;
+        }
+
+        .card-header .timestamp {
+            font-size: 0.75rem;
+            font-family: monospace;
+            color: rgba(255, 255, 255, 0.25);
+            margin-left: auto;
+        }
+
+        .card-body {
+            color: var(--text-light);
+            padding-left: 0.25rem;
+        }
+
+        .log-card.action .card-body code {
+            display: block;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            color: #fdba74;
+            border: 1px solid rgba(249, 115, 22, 0.15);
+            font-family: monospace;
+            word-break: break-all;
+        }
+
+        .log-card.observation .card-body {
+            background: rgba(0, 0, 0, 0.15);
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            font-size: 0.85rem;
+            color: #cbd5e1;
+            font-family: monospace;
         }
 
         .thought .card-header { color: #93c5fd; }
@@ -664,9 +696,12 @@
                 contentHTML = `<code>${message.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code>`;
             }
             
+            const timestamp = new Date().toLocaleTimeString();
+            
             card.innerHTML = `
                 <div class="card-header">
                     <i class="${iconClass}"></i> ${headerTitle}
+                    <span class="timestamp">${timestamp}</span>
                 </div>
                 <div class="card-body">
                     ${contentHTML}
