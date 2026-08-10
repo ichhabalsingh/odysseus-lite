@@ -6,6 +6,19 @@ It features both a **Command Line Interface (CLI)** and a sleek, glassmorphic **
 
 ---
 
+## Motivation
+
+Modern AI coding assistants have revolutionized software development, but they present critical trade-offs that restrict their adoption:
+
+*   **The Privacy Dilemma:** Proprietary codebases, sensitive configuration files, and internal schemas are routinely uploaded to third-party cloud servers. For developers handling private repositories or subject to strict compliance, cloud-reliant tools are a security risk.
+*   **Prohibitive SaaS Costs:** Continuous agentic loops—where an assistant iterates on fixing a bug or refactoring code—can consume millions of tokens, leading to high recurring API bills.
+*   **Hardware Accessibility Barriers:** Most modern agentic frameworks are designed for high-end GPUs or massive cloud clusters. Developers operating on standard workstations or consumer laptops (under 4GB VRAM) lack accessible options.
+*   **Rogue Autonomy Risks:** Allowing an autonomous agent to write files or run shell commands without checkpoints is dangerous. A single hallucinated command can corrupt database tables, delete code, or freeze the operating system.
+
+**Odysseus Lite** addresses these problems. It demonstrates that by combining a **dual-model Planner-Executor split**, a **zero-dependency local RAG engine**, and **interactive human-in-the-loop permission gates**, developers can run a highly capable, private, and secure coding partner entirely on consumer-grade local hardware.
+
+---
+
 ## Example Use Cases
 
 Here are general examples of tasks you can assign to Odysseus Lite:
