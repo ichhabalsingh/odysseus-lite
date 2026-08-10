@@ -76,7 +76,7 @@ graph TD
 
 ---
 
-## Setup & Installation Guide
+## Quick Start
 
 ### Step 1: Install Ollama (Local LLM Engine)
 
@@ -139,7 +139,7 @@ Select the command/installer for your Operating System:
 
 ---
 
-## How to Use
+## Usage
 
 ### Run via Web Dashboard
 Start the local server daemon:
@@ -176,3 +176,16 @@ The terminal will halt and prompt you: `Approve? (y/n):` before executing comman
 *   **Timeout Containment:** Any shell command executed via `tool_bash` that runs longer than 15 seconds is forcibly terminated (`SIGKILL`), releasing the thread.
 *   **Path Traversal Protection:** Absolute path checks prevent the agent from reading or writing files outside the targeted workspace (e.g. attempting to read `/etc/passwd` returns a `Permission Denied` error string).
 *   **Robust Parser Isolation:** The parser only extracts execution tags from final `ACTION:` blocks, ensuring that explaining a tool in the `THOUGHT:` section never accidentally triggers a command.
+
+---
+
+## Contributing
+
+Contributions are welcome! If you would like to help improve Odysseus Lite, please follow these steps:
+
+1. Fork the repository and create your feature branch.
+2. Ensure your changes adhere to local performance optimizations and do not add cloud dependencies.
+3. Test changes locally to verify system reliability and model formatting boundaries.
+4. Submit a detailed pull request outlining your changes and their motivation.
+
+For major architectural updates, please open an issue first to discuss what you would like to change.
