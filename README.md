@@ -1,6 +1,6 @@
 # Odysseus Lite
 
-**Odysseus Lite** is a secure, fully offline local AI workspace co-pilot. Built to run on consumer hardware (under 4GB VRAM) using Ollama, it implements a highly resilient dual-model **Planner-Executor split**, codebase RAG grounding, observation state compaction, and sandboxed interactive permission gates.
+**Odysseus Lite** is a secure, fully offline local AI workspace co-pilot. Built to run on standard consumer hardware (low VRAM constraints) using Ollama, it implements a highly resilient dual-model **Planner-Executor split**, codebase hybrid RAG grounding, a file-hash caching layer, dynamic JSON Schema constraints, observation state compaction, and sandboxed interactive permission gates.
 
 It features both a **Command Line Interface (CLI)** and a sleek, glassmorphic **One Dark web dashboard** that streams live plans, thoughts, and execution logs in real-time.
 
@@ -15,7 +15,7 @@ Modern AI coding assistants have revolutionized software development, but they p
 *   **Hardware Accessibility Barriers:** Most modern agentic frameworks are designed for high-end GPUs or massive cloud clusters. Developers operating on standard workstations or consumer laptops (under 4GB VRAM) lack accessible options.
 *   **Rogue Autonomy Risks:** Allowing an autonomous agent to write files or run shell commands without checkpoints is dangerous. A single hallucinated command can corrupt database tables, delete code, or freeze the operating system.
 
-**Odysseus Lite** addresses these problems. It demonstrates that by combining a **dual-model Planner-Executor split**, a **zero-dependency local RAG engine**, and **interactive human-in-the-loop permission gates**, developers can run a highly capable, private, and secure coding partner entirely on consumer-grade local hardware.
+**Odysseus Lite** addresses these problems. It demonstrates that by combining a **dual-model Planner-Executor split**, a **cached hybrid RAG engine**, and **interactive human-in-the-loop permission gates**, developers can run a highly capable, private, and secure coding partner entirely on consumer-grade local hardware.
 
 ---
 
@@ -40,9 +40,12 @@ Here are general examples of tasks you can assign to Odysseus Lite:
 ## Key Features
 
 *   **Offline First (100% Private):** Runs entirely locally using lightweight models via Ollama. No data ever leaves your machine.
-*   **Schema-Driven Planner-Executor Split:** 
-    *   Offloads step planning to a robust local model (e.g., `llama3.1:8b` or `deepseek-r1:1.5b`) which generates a tool-constrained step JSON array.
-    *   Passes individual atomic steps to a fast executor model (`qwen2.5-coder:3b-instruct` or `granite4.1:3b`) responsible strictly for generating tool parameters. This eliminates cognitive repetition loops.
+*   **JSON Schema Constraints (Ollama format API):** 
+    *   Binds the token outputs of local models directly using structured JSON schemas.
+    *   Prevents tool hallucinations and syntax violations by enforcing strict `enum` constraints on generated tools, ensuring 100% parser compatibility on small models (1.5B - 3B parameters).
+*   **Hybrid RAG Search with Local Cache:**
+    *   Combines sparse keyword search (BM25) and dense semantic search (`nomic-embed-text` vectors) using Reciprocal Rank Fusion (RRF).
+    *   Caches calculated embeddings in a local `.rag_cache.json` using file modification times (`mtime`), reducing startup and re-indexing latency to milliseconds.
 *   **State Compactor (Memory Optimization):**
     *   Dynamically condenses large tool output payloads (like raw file contents or RAG indexes exceeding 500 characters) into concise 1-2 sentence summaries.
     *   Reduces agent latency by **over 57%** and completely prevents context-window overflow and parsing drift.
@@ -53,7 +56,6 @@ Here are general examples of tasks you can assign to Odysseus Lite:
     *   Prevents rogue AI actions. Before running any shell command (`tool_bash`) or editing/writing files, the system halts and waits for explicit human confirmation.
     *   Terminal prompts require a strict y/n confirmation.
     *   The Web UI displays a red slide-down alert panel overlay requiring click-to-approve confirmation before resuming.
-*   **Zero-Dependency Local RAG:** Includes an in-memory indexer that scans and crawls your workspace to feed matching code snippet contexts to the LLM.
 *   **PDF Parsing Integration:** Programmatic binary text extraction via `pypdf` which integrates directly into both the read tool and the RAG indexer.
 *   **Hang-Protection (Process Isolation):** All shell commands are sandboxed with a strict 15-second execution timeout to prevent infinite loops or terminal freeze.
 
@@ -64,7 +66,7 @@ Here are general examples of tasks you can assign to Odysseus Lite:
 ```mermaid
 graph TD
     A[User Request] -->|Web UI / CLI| B[Planner Model]
-    B -->|Schema-Driven Plan JSON| C[Executor Model]
+    B -->|JSON Schema Constraints| C[Executor Model]
     C -->|Execute Step| D{Tool Permission Guard}
     D -->|y/n Prompt| E[User Confirmation]
     E -->|Approve| F[Execute Tool]
@@ -85,10 +87,11 @@ Select the command/installer for your Operating System:
 *   **Windows:**
     1. Download the Windows installer from [Ollama's Official Website](https://ollama.com/download/windows).
     2. Run the `.exe` installer.
-    3. Open PowerShell and pull the recommended Planner and Executor models:
+    3. Open PowerShell and pull the recommended models:
        ```bash
-       ollama pull llama3.1:8b
-       ollama pull qwen2.5-coder:3b-instruct
+       ollama pull deepseek-r1:1.5b
+       ollama pull qwen2.5-coder:1.5b
+       ollama pull nomic-embed-text
        ```
 
 *   **Linux:**
@@ -98,16 +101,18 @@ Select the command/installer for your Operating System:
        ```
     2. Start the service and pull the models:
        ```bash
-       ollama pull llama3.1:8b
-       ollama pull qwen2.5-coder:3b-instruct
+       ollama pull deepseek-r1:1.5b
+       ollama pull qwen2.5-coder:1.5b
+       ollama pull nomic-embed-text
        ```
 
 *   **macOS:**
     1. Download the macOS zip from [Ollama's Official Website](https://ollama.com/download/mac).
     2. Unzip, move `Ollama.app` to your Applications folder, and pull models:
        ```bash
-       ollama pull llama3.1:8b
-       ollama pull qwen2.5-coder:3b-instruct
+       ollama pull deepseek-r1:1.5b
+       ollama pull qwen2.5-coder:1.5b
+       ollama pull nomic-embed-text
        ```
 
 ---
@@ -159,13 +164,13 @@ Open your browser and navigate to: **`http://127.0.0.1:5000`**
 ### Run via Command Line (CLI)
 You can target any workspace directory on your machine using the CLI and customize the models:
 ```bash
-python ody.py "Search codebase for categories and write to notes.txt" -w /path/to/project -p llama3.1:8b -e qwen2.5-coder:3b-instruct
+python ody.py "Search codebase for categories and write to notes.txt" -w /path/to/project -p deepseek-r1:1.5b -e qwen2.5-coder:1.5b
 ```
 
 #### CLI Parameters:
 *   `-w`, `--workspace`: Path to the workspace directory to scan and work in (defaults to current working directory).
-*   `-p`, `--planner`: Local model to use for step planning (defaults to `llama3.1:8b`).
-*   `-e`, `--executor`: Local model to use for step execution (defaults to `qwen2.5-coder:3b-instruct`).
+*   `-p`, `--planner`: Local model to use for step planning (defaults to `deepseek-r1:1.5b`).
+*   `-e`, `--executor`: Local model to use for step execution (defaults to `qwen2.5-coder:1.5b`).
 
 The terminal will halt and prompt you: `Approve? (y/n):` before executing commands or saving file updates.
 
@@ -175,7 +180,6 @@ The terminal will halt and prompt you: `Approve? (y/n):` before executing comman
 
 *   **Timeout Containment:** Any shell command executed via `tool_bash` that runs longer than 15 seconds is forcibly terminated (`SIGKILL`), releasing the thread.
 *   **Path Traversal Protection:** Absolute path checks prevent the agent from reading or writing files outside the targeted workspace (e.g. attempting to read `/etc/passwd` returns a `Permission Denied` error string).
-*   **Robust Parser Isolation:** The parser only extracts execution tags from final `ACTION:` blocks, ensuring that explaining a tool in the `THOUGHT:` section never accidentally triggers a command.
 
 ---
 
