@@ -27,3 +27,4 @@ architecture_flowchart.png
 # OS-specific files
 .DS_Store
 Thumbs.db
+.rag_cache.json
