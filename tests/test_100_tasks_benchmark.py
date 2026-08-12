@@ -8,8 +8,12 @@ import argparse
 import subprocess
 import ollama
 
+# Add parent directory to system path to import core config
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from core.config import Config
+
 # --- CONFIGURATION ---
-MODEL = "qwen2.5-coder:3b-instruct"
+MODEL = Config.EXECUTOR_MODEL
 REPORT_FILE = "100_tasks_benchmark_report.md"
 
 # =====================================================================
@@ -165,13 +169,14 @@ def run_task(task_obj: dict) -> dict:
         is_success = True
         reason = "Pass"
         
-        if domain == "Medical" and "MEDICAL DISCLAIMER" not in content:
+        content_lower = content.lower()
+        if domain == "Medical" and "medical disclaimer" not in content_lower:
             is_success = False
             reason = "Failed Medical Disclaimer check"
-        elif domain == "Education" and "ANSWER KEY" not in content and "quiz" in prompt:
+        elif domain == "Education" and "answer key" not in content_lower and "quiz" in prompt:
             is_success = False
             reason = "Failed Answer Key check"
-        elif domain == "Student" and ("Q:" not in content or "A:" not in content):
+        elif domain == "Student" and ("q:" not in content_lower or "a:" not in content_lower):
             is_success = False
             reason = "Failed Study Card Q&A formatting check"
             
@@ -206,11 +211,9 @@ def main():
     print(f"   STARTING BENCHMARK: RUNNING {sample_size} TASKS OUT OF 100")
     print("==================================================")
     
-    # Select sample tasks (distributed across domains)
     import random
-    random.seed(42) # Seed for reproducible sampling
+    random.seed(42)
     
-    # Select balanced samples from each domain
     sampled_tasks = []
     domains = ["Engineering", "Operations", "Medical", "Education", "Student"]
     tasks_per_domain = max(1, sample_size // 5)
@@ -219,7 +222,6 @@ def main():
         domain_tasks = [t for t in TASKS if t["domain"] == d]
         sampled_tasks.extend(random.sample(domain_tasks, min(tasks_per_domain, len(domain_tasks))))
         
-    # Trim to match exact sample size if rounding discrepancies occurred
     sampled_tasks = sampled_tasks[:sample_size]
     
     run_results = []
@@ -230,36 +232,35 @@ def main():
         res = run_task(t)
         run_results.append(res)
         total_time += res["elapsed"]
-        status = "✓ PASS" if res["success"] else f"✗ FAIL ({res['reason']})"
+        status = "PASS" if res["success"] else f"FAIL ({res['reason']})"
         print(f"     Time: {res['elapsed']:.2f}s | Status: {status}")
         
-    # Compute Statistics
     passed_runs = [r for r in run_results if r["success"]]
     pass_rate = (len(passed_runs) / len(run_results)) * 100
     avg_latency = total_time / len(run_results)
     
-    print("\n✓ Benchmarks completed!")
+    print("\nBenchmarks completed!")
     print(f"  Total Time: {total_time:.2f}s")
     print(f"  Avg Latency: {avg_latency:.2f}s / task")
     print(f"  Pass Rate: {pass_rate:.1f}% ({len(passed_runs)}/{len(run_results)})")
     
     # Generate Markdown Report
     report_md = f"""# Odysseus Lite: 100-Task Architectural Robustness Report
-
-This report evaluates the instruction-adherence, domain adaptability, and speed of a local 3B model (`{MODEL}`) executing tasks drawn from a 100-task battery.
-
+ 
+This report evaluates the instruction-adherence, domain adaptability, and speed of a local 1.5B model (`{MODEL}`) executing tasks drawn from a 100-task battery.
+ 
 ---
-
+ 
 ## 1. Executive Performance Metrics
 * **Total Tasks Executed:** {sample_size} (Sampled from the 100-task database)
 * **Combined Runtime:** {total_time:.2f} seconds
 * **Average Task Latency:** {avg_latency:.2f} seconds
 * **Programmatic Pass Rate:** **{pass_rate:.1f}%** ({len(passed_runs)}/{len(run_results)} passed)
-
+ 
 ---
-
+ 
 ## 2. Domain-Specific Breakdown
-
+ 
 | Domain | Tasks Run | Passes | Fails | Pass Rate | Avg Latency |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 """
@@ -273,26 +274,26 @@ This report evaluates the instruction-adherence, domain adaptability, and speed 
         
     report_md += """
 ---
-
+ 
 ## 3. Comprehensive Task Execution Logs
-
+ 
 | Task ID | Domain | Task Query | Status | Latency | Output Preview |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 """
     
     for r in run_results:
-        status = "✓ PASS" if r["success"] else f"✗ FAIL ({r['reason']})"
+        status = "PASS" if r["success"] else f"FAIL ({r['reason']})"
         report_md += f"| {r['id']} | {r['domain']} | {r['task']} | {status} | {r['elapsed']:.2f}s | {r['output_preview']} |\n"
         
     report_md += """
 ---
-
+ 
 ## 4. Engineering Recommendations for Domain Tuning
-
+ 
 1. **Medical Clinical SOPs:**
    * Guardrail check: Ensure a parser checks for the string `MEDICAL DISCLAIMER` before logging notes to patient histories.
 2. **Education/Quiz Workloads:**
-   * Granite/Qwen 3B models write excellent multiple-choice structures, but require an explicit instruction to append the `ANSWER KEY` to the bottom to avoid cheating/incomplete outputs.
+   * Qwen 1.5B model writes excellent multiple-choice structures, but require an explicit instruction to append the `ANSWER KEY` to the bottom to avoid cheating/incomplete outputs.
 3. **Student Study Aids:**
    * Forcing the Q&A pattern card structure is best done by providing a few-shot exemplar in the system prompt.
 """
@@ -300,7 +301,7 @@ This report evaluates the instruction-adherence, domain adaptability, and speed 
     with open(REPORT_FILE, "w", encoding="utf-8") as f:
         f.write(report_md)
         
-    print(f"\n✓ Master Report written successfully to {REPORT_FILE}!")
+    print(f"\nMaster Report written successfully to {REPORT_FILE}!")
 
 if __name__ == "__main__":
     main()

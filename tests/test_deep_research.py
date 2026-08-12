@@ -1,11 +1,17 @@
 import re
 import json
 import time
+import sys
+import os
 import ollama
 from duckduckgo_search import DDGS
 
+# Add parent directory to system path to import core config
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from core.config import Config
+
 # --- CONFIGURATION ---
-MODEL = "qwen2.5-coder:3b-instruct"
+MODEL = Config.EXECUTOR_MODEL
 REPORT_FILE = "research_report.md"
 
 # =====================================================================
@@ -168,14 +174,13 @@ FACTS GATHERED:
     report = res_final['message']['content'].strip()
     
     elapsed = time.time() - start_time
-    print(f"\n✓ Deep Research finished in {elapsed:.2f} seconds.")
+    print(f"\n[INFO] Deep Research finished in {elapsed:.2f} seconds.")
     
     # Save Report
     with open(REPORT_FILE, "w", encoding="utf-8") as f:
         f.write(report)
-    print(f"✓ Final report written to {REPORT_FILE}!")
+    print(f"[INFO] Final report written to {REPORT_FILE}!")
 
 if __name__ == "__main__":
-    # Topic that requires multiple perspectives/updates
     test_topic = "Compare the latest stable releases of Python, Rust, and Go as of the current year (2026)."
     run_deep_research(test_topic, max_depth=2)
