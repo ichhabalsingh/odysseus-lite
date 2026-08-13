@@ -127,8 +127,20 @@ def run_agent():
     
     if not goal:
         return jsonify({"status": "error", "message": "No goal provided"}), 400
+
+    if not workspace:
+        return jsonify({"status": "error", "message": "No workspace provided"}), 400
+
+    safe_root = os.path.realpath(os.getcwd())
+    requested_workspace = os.path.realpath(workspace)
+
+    if not os.path.isdir(requested_workspace):
+        return jsonify({"status": "error", "message": "Workspace path must be an existing directory"}), 400
+
+    if os.path.commonpath([safe_root, requested_workspace]) != safe_root:
+        return jsonify({"status": "error", "message": "Workspace path is outside the allowed root"}), 400
         
-    state.workspace_dir = os.path.abspath(workspace)
+    state.workspace_dir = requested_workspace
     state.model = model
     state.planner_model = planner_model
     
@@ -136,9 +148,6 @@ def run_agent():
     Config.WORKSPACE_DIR = state.workspace_dir
     Config.EXECUTOR_MODEL = state.model
     Config.PLANNER_MODEL = state.planner_model
-    
-    if not os.path.exists(state.workspace_dir):
-        return jsonify({"status": "error", "message": "Workspace path does not exist"}), 400
         
     # Re-initialize local RAG for the target workspace
     get_rag_indexer(state.workspace_dir)
