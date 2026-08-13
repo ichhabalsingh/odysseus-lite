@@ -53,8 +53,10 @@ class BM25:
 
 class LocalRAG:
     def __init__(self, workspace_dir):
-        self.workspace_dir = os.path.abspath(workspace_dir)
-        self.cache_path = os.path.join(self.workspace_dir, ".rag_cache.json")
+        self.workspace_dir = os.path.realpath(workspace_dir)
+        self.cache_path = os.path.realpath(os.path.join(self.workspace_dir, ".rag_cache.json"))
+        if os.path.commonpath([self.workspace_dir, self.cache_path]) != self.workspace_dir:
+            raise ValueError("Cache path must be within the workspace directory.")
         self.chunks = []
         self.index_workspace()
 
@@ -75,12 +77,17 @@ class LocalRAG:
 
         # 2. Scan workspace directory
         for root, _, files in os.walk(self.workspace_dir):
-            if ".venv" in root or ".git" in root:
+            root_real = os.path.realpath(root)
+            if os.path.commonpath([self.workspace_dir, root_real]) != self.workspace_dir:
+                continue
+            if ".venv" in root_real or ".git" in root_real:
                 continue
             for file in files:
                 if file.startswith(".") or file == ".rag_cache.json":
                     continue
-                path = os.path.join(root, file)
+                path = os.path.realpath(os.path.join(root_real, file))
+                if os.path.commonpath([self.workspace_dir, path]) != self.workspace_dir:
+                    continue
                 rel_path = os.path.relpath(path, self.workspace_dir)
 
                 if file.endswith((".py", ".md", ".json", ".txt", ".pdf")):
@@ -219,11 +226,11 @@ _rag_indexer = None
 
 def get_rag_indexer(workspace_dir=None):
     global _rag_indexer
-    if _rag_indexer is None or (workspace_dir and os.path.abspath(workspace_dir) != os.path.abspath(_rag_indexer.workspace_dir)):
+    if _rag_indexer is None or (workspace_dir and os.path.realpath(workspace_dir) != os.path.realpath(_rag_indexer.workspace_dir)):
         if not workspace_dir:
             from core.config import Config
             workspace_dir = Config.WORKSPACE_DIR
-        _rag_indexer = LocalRAG(os.path.abspath(workspace_dir))
+        _rag_indexer = LocalRAG(os.path.realpath(workspace_dir))
     return _rag_indexer
 
 def query_workspace_rag(args: dict, permission_callback=None) -> str:

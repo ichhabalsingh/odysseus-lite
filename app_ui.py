@@ -185,4 +185,5 @@ if __name__ == '__main__':
     except Exception as e:
         print(f"[WARNING] Could not preload models over Ollama. details: {e}")
         
-    app.run(host='127.0.0.1', port=5000, debug=True)
+    debug_mode = os.environ.get("FLASK_DEBUG", "false").lower() in ("true", "1", "t", "yes")
+    app.run(host='127.0.0.1', port=5000, debug=debug_mode)

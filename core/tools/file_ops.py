@@ -1,13 +1,22 @@
 import os
 from core.config import Config
 
+def is_path_in_workspace(path: str) -> tuple[bool, str]:
+    """Helper to verify if a path points inside the workspace directory, resolving all symlinks/relative paths."""
+    real_workspace = os.path.realpath(Config.WORKSPACE_DIR)
+    resolved_path = os.path.realpath(os.path.join(real_workspace, path))
+    is_safe = os.path.commonpath([real_workspace, resolved_path]) == real_workspace
+    return is_safe, resolved_path
+
 def read_file(args: dict, permission_callback=None) -> str:
     path = args.get("path", "")
     if not path:
         return "Error: No file path provided."
-    safe_path = os.path.abspath(os.path.join(Config.WORKSPACE_DIR, path))
-    if not safe_path.startswith(os.path.abspath(Config.WORKSPACE_DIR)):
+    
+    is_safe, safe_path = is_path_in_workspace(path)
+    if not is_safe:
         return "Permission Denied: Path is outside workspace."
+        
     try:
         # PDF parsing fallback
         if safe_path.lower().endswith('.pdf'):
@@ -34,8 +43,9 @@ def write_file(args: dict, permission_callback=None) -> str:
     content = args.get("content", "")
     if not path:
         return "Error: No path provided."
-    safe_path = os.path.abspath(os.path.join(Config.WORKSPACE_DIR, path))
-    if not safe_path.startswith(os.path.abspath(Config.WORKSPACE_DIR)):
+        
+    is_safe, safe_path = is_path_in_workspace(path)
+    if not is_safe:
         return "Permission Denied: Path is outside workspace."
         
     # Interactive Permission Gate
@@ -57,8 +67,9 @@ def append_file(args: dict, permission_callback=None) -> str:
     content = args.get("content", "")
     if not path:
         return "Error: No path provided."
-    safe_path = os.path.abspath(os.path.join(Config.WORKSPACE_DIR, path))
-    if not safe_path.startswith(os.path.abspath(Config.WORKSPACE_DIR)):
+        
+    is_safe, safe_path = is_path_in_workspace(path)
+    if not is_safe:
         return "Permission Denied: Path is outside workspace."
         
     # Interactive Permission Gate
